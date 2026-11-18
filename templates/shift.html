@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% from "_macros.html" import np_pill, when, csrf %}
+{% block title %}{{ s.building }} {{ s.name }} {{ s.starts_at[:10] }} · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="head"><div>
+<h1>{{ s.building }} · {{ s.name }} shift</h1>
+<p class="muted">{{ s.starts_at|day }}, {{ s.starts_at|t }} to {{ s.ends_at|t }} · supervisor {{ s.supervisor or '—' }}
+{% if s.status == 'open' %} <span class="pill open">Open</span>{% else %} <span class="pill closed">Signed {{ s.closed_at|t }} by {{ s.closed_by_name }}</span>{% endif %}</p></div>
+<div class="actions">{% if can_add %}<a class="btn orange" href="{{ url_for('entry_new', sid=s.id) }}">Log work</a>{% endif %}
+<a class="btn" href="{{ url_for('shift_report', sid=s.id) }}">Shift report</a></div></div>
+
+{# ---------------- turnover from earlier shifts #}
+<div class="card" id="turnover"><h2>Turnover: open items from earlier shifts</h2>
+{% if r.carried_in %}<ul class="list">{% for f in r.carried_in %}
+<li><strong>{{ f.subject_label or f.where_text or 'General' }}</strong>: {{ f.follow_up_note }}
+<span class="small muted">· raised {{ f.shift_start|day }} {{ f.shift_name }} by {{ f.person }}{% if f.follow_up_closed_at %} · closed {{ f.follow_up_closed_at|t }}{% endif %}</span>
+{% if not f.follow_up_closed_at and can_add %}<a class="btn small" href="{{ url_for('entry_new', sid=s.id, resolves=f.id) }}">Log the fix</a>{% endif %}</li>
+{% endfor %}</ul>{% else %}<p class="muted">Nothing was handed over.</p>{% endif %}
+{% if s.turnover_ack_at %}<p class="small">Received by {{ s.turnover_by_name }} at {{ s.turnover_ack_at|t }}{% if s.turnover_note %}: {{ s.turnover_note }}{% endif %}</p>
+{% elif can_run(me) and s.status == 'open' %}
+<form method="post" action="{{ url_for('shift_turnover', sid=s.id) }}" class="actions">{{ csrf() }}
+<input name="note" placeholder="Note from the handover (optional)" style="max-width:420px"><button class="btn" type="submit">Turnover received</button></form>{% endif %}
+</div>
+
+{# ---------------- crew #}
+<div class="card" id="crew"><h2>Crew</h2>
+<div class="scroll"><table><thead><tr><th>Name</th><th>Status</th><th>In</th><th>Out</th><th class="num">On shift</th><th class="num">Logged</th><th>Note</th>{% if can_run(me) and s.status == 'open' %}<th></th>{% endif %}</tr></thead><tbody>
+{% for c in r.crew %}
+{% if can_run(me) and s.status == 'open' %}
+{% set fid = 'crew' ~ c.user_id %}
+<tr><td><form id="{{ fid }}" method="post" action="{{ url_for('shift_crew', sid=s.id) }}">{{ csrf() }}<input type="hidden" name="user_id" value="{{ c.user_id }}"><input type="hidden" name="action" value="save"></form>
+<strong>{{ c.name }}</strong><br><span class="small muted">{{ c.trade or c.role }}</span></td>
+<td><select form="{{ fid }}" name="status" aria-label="Status for {{ c.name }}">{% for k, v in CREW_STATUSES.items() %}<option value="{{ k }}" {{ 'selected' if c.status == k }}>{{ v }}</option>{% endfor %}</select></td>
+<td><input form="{{ fid }}" type="time" name="time_in" value="{{ c.time_in[11:16] if c.time_in }}" aria-label="Time in for {{ c.name }}"></td>
+<td><input form="{{ fid }}" type="time" name="time_out" value="{{ c.time_out[11:16] if c.time_out }}" aria-label="Time out for {{ c.name }}"></td>
+<td class="num">{{ c.minutes|hm }}{% if c.so_far %}<br><span class="small muted">so far</span>{% endif %}</td><td class="num">{{ c.logged|hm }}</td>
+<td><input form="{{ fid }}" name="note" value="{{ c.note or '' }}" aria-label="Note for {{ c.name }}"></td>
+<td><button form="{{ fid }}" class="btn small" type="submit">Save</button></td></tr>
+{% else %}
+<tr><td><strong>{{ c.name }}</strong><br><span class="small muted">{{ c.trade or c.role }}</span></td><td>{{ CREW_STATUSES[c.status] }}</td>
+<td>{{ c.time_in|t }}</td><td>{{ c.time_out|t }}{% if c.user_id == me.id and s.status == 'open' and not c.time_out %}
+<form class="inline" method="post" action="{{ url_for('shift_crew', sid=s.id) }}">{{ csrf() }}<input type="hidden" name="action" value="clock_out"><button class="btn small" type="submit">Clock out now</button></form>{% endif %}</td>
+<td class="num">{{ c.minutes|hm }}{% if c.so_far %}<br><span class="small muted">so far</span>{% endif %}</td><td class="num">{{ c.logged|hm }}</td><td>{{ c.note or '' }}</td></tr>
+{% endif %}
+{% endfor %}
+</tbody></table></div>
+{% if can_run(me) and s.status == 'open' and not_on_crew %}
+<form method="post" action="{{ url_for('shift_crew', sid=s.id) }}" class="actions" style="margin-top:10px">{{ csrf() }}<input type="hidden" name="action" value="save">
+<select name="user_id" aria-label="Add someone" style="max-width:260px">{% for u in not_on_crew %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select>
+<select name="status" aria-label="Status" style="max-width:180px">{% for k, v in CREW_STATUSES.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+<input type="time" name="time_in" aria-label="Time in" style="max-width:140px"><button class="btn small" type="submit">Add to crew</button></form>{% endif %}
+{% if me.role == 'technician' and s.status == 'open' and me.id not in crew_ids %}
+<form method="post" action="{{ url_for('shift_crew', sid=s.id) }}">{{ csrf() }}<input type="hidden" name="action" value="join"><button class="btn" type="submit">I'm on this shift</button></form>{% endif %}
+</div>
+
+{# ---------------- entries #}
+<div class="card" id="entries"><div class="head"><h2>Work and activities</h2><span class="muted small">{{ r.total_logged|hm }} logged of {{ r.crew_minutes|hm }} crew time{{ ' so far' if r.so_far }}</span></div>
+{% if r.entries %}<div class="scroll"><table><thead><tr><th>Who</th><th>Time</th><th>What</th><th>Equipment or place</th><th>Notes</th><th>Record</th><th></th></tr></thead><tbody>
+{% for e in r.entries %}
+<tr><td>{{ e.person }}</td><td>{{ when(e) }}<br><span class="small muted">{{ e.minutes|hm }}</span></td>
+<td class="cat">{{ label(e.category) }}{% if e.wo_ref %}<br><span class="small muted">WO {{ e.wo_ref }}</span>{% endif %}</td>
+<td>{{ e.subject_label or '—' }}</td>
+<td>{{ e.notes }}
+{% if e.reading_value is not none %}<br><strong>{{ e.reading_name }}: {{ '%g'|format(e.reading_value) }} {{ e.reading_unit or '' }}</strong>{% endif %}
+{% if e.result %}<br><strong>Result: {{ RESULTS[e.result] }}</strong>{% endif %}
+{% if e.materials %}<br><span class="small muted">Materials: {{ e.materials }}</span>{% endif %}
+{% if e.follow_up %}<br><span class="pill {{ 'closed' if e.follow_up_closed_at else 'open' }}">Follow-up{{ ' closed' if e.follow_up_closed_at }}</span> {{ e.follow_up_note }}{% endif %}
+{% if e.resolves_entry_id %}<br><span class="small muted">Closes an earlier follow-up</span>{% endif %}</td>
+<td>{{ np_pill(e) }}</td>
+<td>{% if can_edit(e) %}<a class="btn small" href="{{ url_for('entry_edit', eid=e.id) }}">Edit</a>{% elif s.status == 'closed' and can_run(me) %}<a class="btn small" href="{{ url_for('entry_correct', eid=e.id) }}">Correct</a>{% endif %}</td></tr>
+{% endfor %}</tbody></table></div>
+{% else %}<p class="muted">Nothing logged yet.</p>{% endif %}
+{% if r.corrected %}<details><summary>{{ r.corrected|length }} replaced or withdrawn entr{{ 'y' if r.corrected|length == 1 else 'ies' }} (kept on file)</summary>
+<table><tbody>{% for e in r.corrected %}<tr class="replaced"><td>{{ e.person }}</td><td>{{ label(e.category) }}</td><td>{{ e.subject_label or '' }}</td><td>{{ e.notes }}</td><td>{{ e.minutes|hm }}</td></tr>{% endfor %}</tbody></table></details>{% endif %}
+</div>
+
+{# ---------------- close #}
+<div class="card" id="close"><h2>Sign-off</h2>
+{% if s.status == 'closed' %}
+<div class="signed">Signed off by {{ s.closed_by_name }}, {{ s.closed_at|day }} at {{ s.closed_at|t }}.</div>
+{% if s.notes %}<p><strong>Supervisor's notes:</strong> {{ s.notes }}</p>{% endif %}
+<p class="small muted">Signed entries aren't edited. Use Correct: the original stays on file, marked as replaced, and Nameplate gets the same correction.</p>
+{% elif can_run(me) %}
+<form method="post" action="{{ url_for('shift_close', sid=s.id) }}">{{ csrf() }}
+<label for="notes">Supervisor's notes for the report <span class="muted">(optional)</span></label>
+<textarea id="notes" name="notes" placeholder="Anything management should know about this shift"></textarea>
+{% if missing_out %}<p class="flash error" style="margin-top:10px">No time out yet for {{ missing_out|map(attribute='name')|join(', ') }}.</p>
+<label class="check"><input type="checkbox" name="fill_out" value="1"> Use the shift end ({{ s.ends_at|t }}) for anyone without a time out</label>{% endif %}
+<p class="small muted">Closing signs the shift. Work on equipment and the building then goes to Nameplate. Crew hours, training and other time stay here.</p>
+<button class="btn primary" type="submit">Close and sign the shift</button>
+</form>
+{% else %}<p class="muted">The supervisor closes and signs the shift.</p>{% endif %}
+</div>
+{% endblock %}

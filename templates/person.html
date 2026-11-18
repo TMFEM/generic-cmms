@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% macro v(k) %}{{ u[k] if u and u[k] else '' }}{% endmacro %}
+{% block content %}
+<h1>{{ 'Edit ' ~ u.name if u and u.name else 'Add a person' }}</h1>
+<form method="post" class="card">{{ csrf() }}
+<div class="fields">
+<div><label for="n">Name</label><input id="n" name="name" required value="{{ v('name') }}"></div>
+<div><label for="r">Role</label><select id="r" name="role">{% for k, lbl in [('technician','Technician'),('supervisor','Supervisor'),('manager','Manager (reports, read-only)'),('admin','Admin')] %}<option value="{{ k }}" {{ 'selected' if u and u.role == k }}>{{ lbl }}</option>{% endfor %}</select></div>
+<div><label for="t">Trade or title</label><input id="t" name="trade" value="{{ v('trade') }}" placeholder="Building engineer, porter, electrician"></div>
+</div>
+<fieldset><legend>Sign-in</legend><div class="fields">
+<div><label for="e">Email <span class="muted">(blank: can't sign in)</span></label><input id="e" name="email" type="email" value="{{ v('email') }}"></div>
+<div><label for="p">{{ 'New password' if u and u.name else 'Password' }} <span class="muted">(10+ characters)</span></label><input id="p" name="password" type="password" autocomplete="new-password"></div>
+</div></fieldset>
+<fieldset><legend>Credential shown on their work</legend><div class="fields">
+<div><label for="ct">Type</label><input id="ct" name="credential_type" value="{{ v('credential_type') }}" placeholder="e.g. FDNY COF S-12, EPA 608 Universal"></div>
+<div><label for="cn">Number</label><input id="cn" name="credential_number" value="{{ v('credential_number') }}"></div>
+<div><label for="cx">Expires</label><input id="cx" name="credential_expires" type="date" value="{{ v('credential_expires') }}"></div>
+</div></fieldset>
+<fieldset><legend>Nameplate technician id <span class="muted">(optional)</span></legend>
+<input name="np_technician_id" value="{{ v('np_technician_id') }}" aria-label="Nameplate technician id" placeholder="The person gives you this from their Nameplate record">
+<p class="small muted">Linking puts their work on their own portable record. It's theirs; only link it with their say-so.</p></fieldset>
+{% if u and u.name %}<label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if u.active }}> Active</label><input type="hidden" name="active" value="0">{% endif %}
+<div class="actions" style="margin-top:12px"><button class="btn primary" type="submit">Save</button><a class="btn" href="{{ url_for('people') }}">Cancel</a></div>
+</form>
+{% endblock %}

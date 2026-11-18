@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block content %}
+<div class="head"><div><h1>Today</h1><p class="muted">{{ today }}</p></div>
+{% if follow %}<a class="btn" href="{{ url_for('follow_ups') }}">{{ follow }} open follow-up{{ '' if follow == 1 else 's' }}</a>{% endif %}</div>
+
+{% if mine %}{% for s in mine %}
+<div class="card accent"><h2>You're on {{ s.building }}, {{ s.name }} shift</h2>
+<p class="muted">{{ s.starts_at|t }} to {{ s.ends_at|t }} · supervisor {{ s.supervisor or '—' }} · {{ s.entry_n }} entries so far</p>
+<div class="actions"><a class="btn orange" href="{{ url_for('entry_new', sid=s.id) }}">Log work</a><a class="btn" href="{{ url_for('shift_page', sid=s.id) }}">Open the shift</a></div></div>
+{% endfor %}{% endif %}
+
+<div class="card"><h2>Open shifts</h2>
+{% if open_shifts %}<ul class="list">{% for s in open_shifts %}
+<li><a href="{{ url_for('shift_page', sid=s.id) }}"><strong>{{ s.building }} · {{ s.name }}</strong></a> <span class="pill open">Open</span><br>
+<span class="small muted">{{ s.starts_at|day }}, {{ s.starts_at|t }}–{{ s.ends_at|t }} · supervisor {{ s.supervisor or '—' }} · crew {{ s.crew_n }} · {{ s.entry_n }} entries</span>
+{% if me.role == 'technician' and s not in mine %}<form class="inline" method="post" action="{{ url_for('shift_crew', sid=s.id) }}">{{ csrf() }}<input type="hidden" name="action" value="join"> <button class="btn small" type="submit">I'm on this shift</button></form>{% endif %}
+</li>{% endfor %}</ul>
+{% else %}<p class="muted">No shift is open.</p>{% endif %}
+</div>
+
+{% if can_run(me) %}
+<div class="card"><h2>Start a shift</h2>
+{% if not buildings %}<p>Add a building first{% if me.role == 'admin' %}: <a href="{{ url_for('buildings') }}">Buildings</a>{% else %} (ask an admin){% endif %}.</p>
+{% else %}
+<form method="post" action="{{ url_for('shift_new') }}">{{ csrf() }}
+<div class="fields">
+<div><label for="b">Building</label><select id="b" name="building_id">{% for b in buildings %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select></div>
+<div><label for="t">Shift</label><select id="t" name="shift_type_id">{% for t in types %}<option value="{{ t.id }}" {{ 'selected' if guess and t.id == guess.id }}>{{ t.name }} ({{ t.start_time }}–{{ t.end_time }})</option>{% endfor %}</select></div>
+<div><label for="d">Date the shift starts</label><input id="d" type="date" name="day" value="{{ today }}"></div>
+<div><label for="sup">Supervisor</label><select id="sup" name="supervisor_id">{% for u in supervisors %}<option value="{{ u.id }}" {{ 'selected' if u.id == me.id }}>{{ u.name }}</option>{% endfor %}</select></div>
+</div>
+<fieldset><legend>Crew on this shift</legend><div class="fields">
+{% for u in crew if u.role == 'technician' %}<label class="check"><input type="checkbox" name="crew" value="{{ u.id }}" checked> {{ u.name }} <span class="muted small">{{ u.trade or '' }}</span></label>{% endfor %}
+</div><p class="small muted">Everyone starts with time in at the shift start. Fix late arrivals and call-outs on the shift page.</p></fieldset>
+<button class="btn primary" type="submit">Start shift</button>
+</form>{% endif %}
+</div>
+{% endif %}
+
+<div class="card"><h2>Recently closed</h2>
+{% if recent %}<ul class="list">{% for s in recent %}<li><a href="{{ url_for('shift_page', sid=s.id) }}">{{ s.building }} · {{ s.starts_at|day }} · {{ s.name }}</a> <span class="pill closed">Signed</span> <span class="small muted">{{ s.entry_n }} entries · {{ s.supervisor }}</span> · <a class="small" href="{{ url_for('shift_report', sid=s.id) }}">Report</a></li>{% endfor %}</ul>
+{% else %}<p class="muted">None yet.</p>{% endif %}
+</div>
+{% endblock %}

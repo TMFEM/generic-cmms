@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block content %}
+<h1>Buildings</h1><p class="muted">Each building comes from Nameplate, with its places and equipment. The crew picks from that list when they log work.</p>
+<div class="card scroll"><table><thead><tr><th>Building</th><th>BIN</th><th class="num">Places</th><th class="num">Equipment</th><th>Last read</th><th></th></tr></thead><tbody>
+{% for b in rows %}<tr><td>{{ b.name }}</td><td>{{ b.bin or '' }}</td><td class="num">{{ b.place_n }}</td><td class="num">{{ b.eq_n }}</td><td>{{ b.refreshed|t }} {{ (b.refreshed or '')[:10] }}</td>
+<td><form method="post">{{ csrf() }}<input type="hidden" name="action" value="refresh"><input type="hidden" name="building_id" value="{{ b.id }}"><button class="btn small" type="submit">Refresh from Nameplate</button></form></td></tr>
+{% else %}<tr><td colspan="6" class="muted">No buildings yet.</td></tr>{% endfor %}</tbody></table></div>
+<div class="card"><h2>Add a building</h2>
+<form method="post">{{ csrf() }}<input type="hidden" name="action" value="add">
+<div class="fields">
+{% if found %}<div><label for="loc">From Nameplate</label><select id="loc" name="np_location_id"><option value="">Pick one, or use the BIN</option>{% for l in found %}<option value="{{ l.id }}">{{ l.name }}</option>{% endfor %}</select></div>{% endif %}
+<div><label for="bin">NYC BIN <span class="muted">(7 digits)</span></label><input id="bin" name="bin" inputmode="numeric" pattern="[0-9]{7}"></div>
+<div><label for="nm">Name here <span class="muted">(optional)</span></label><input id="nm" name="name"></div>
+</div><button class="btn primary" type="submit">Add building</button></form>
+<p class="small muted">The owner has to give this app access to their record in Nameplate first.</p></div>
+<p><a href="{{ url_for('shift_times') }}">Shift times</a></p>
+{% endblock %}

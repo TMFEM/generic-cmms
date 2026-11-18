@@ -1,0 +1,11 @@
+{% macro np_pill(e) -%}
+{% if e.np_status == 'in Nameplate' %}<span class="pill np" title="In the building's shared record">In Nameplate</span>
+{% elif e.np_status == 'stays here' %}<span class="pill local" title="Crew time stays with the maintenance group">Stays here</span>
+{% elif e.np_status == 'no equipment or place chosen' %}<span class="pill local" title="Pick equipment or a place to put it in the building's record">Not linked</span>
+{% elif e.np_status == 'waiting to send' %}<span class="pill open">Waiting to send</span>
+{% else %}<span class="pill">Sent at close</span>{% endif %}
+{%- endmacro %}
+{% macro when(e) -%}
+{% if e.started_at and e.ended_at %}{{ e.started_at|t }}–{{ e.ended_at|t }}{% elif e.started_at %}from {{ e.started_at|t }}{% endif %}
+{%- endmacro %}
+{% macro csrf() %}<input type="hidden" name="_csrf" value="{{ csrf_token() }}">{% endmacro %}

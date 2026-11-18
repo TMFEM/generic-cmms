@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% macro v(k) %}{{ e[k] if e and k in e.keys() and e[k] is not none else '' }}{% endmacro %}
+{% block title %}{{ {'new': 'Log work', 'edit': 'Edit entry', 'correct': 'Correct entry'}[mode] }} · {{ APP_NAME }}{% endblock %}
+{% block content %}
+{% set cur_subject = ('asset:' ~ e.np_asset_id) if e and e.np_asset_id else (('place:' ~ e.np_location_id) if e and e.np_location_id else '') %}
+{% set st = (e.start_clock if e and 'start_clock' in e.keys() else (e.started_at[11:16] if e and e.started_at else '')) %}
+{% set en = (e.end_clock if e and 'end_clock' in e.keys() else (e.ended_at[11:16] if e and e.ended_at else '')) %}
+{% set timed = st and en %}
+<div class="head"><div><h1>{{ {'new': 'Log work', 'edit': 'Edit entry', 'correct': 'Correct a signed entry'}[mode] }}</h1>
+<p class="muted">{{ s.building }} · {{ s.name }} shift, {{ s.starts_at|day }} ({{ s.starts_at|t }}–{{ s.ends_at|t }})</p></div>
+<a class="btn" href="{{ url_for('shift_page', sid=s.id) }}#entries">Back to the shift</a></div>
+{% if mode == 'correct' %}<div class="card accent"><p>This shift is signed. Saving makes a <strong>new</strong> entry that replaces this one. The original stays on file, marked as replaced, and if it already went to Nameplate it's withdrawn there with your reason.</p></div>{% endif %}
+
+<form method="post" class="card" id="entry">{{ csrf() }}
+<div class="fields">
+{% if can_run(me) %}<div><label for="who">Who did it</label><select id="who" name="user_id">{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if (e and e.user_id == p.id) or (not e or not e.user_id) and p.id == me.id }}>{{ p.name }}</option>{% endfor %}</select></div>
+{% else %}<div><label>Who did it</label><p>{{ me.name }}</p></div>{% endif %}
+<div><label for="cat">What kind of work</label><select id="cat" name="category" required>
+<option value="">Pick one</option>
+<optgroup label="Goes in the building's record">{% for k, c in CATEGORIES.items() if c[1] %}<option value="{{ k }}" {{ 'selected' if e and e.category == k }}>{{ c[0] }}</option>{% endfor %}</optgroup>
+<optgroup label="Stays with the crew's records">{% for k, c in CATEGORIES.items() if not c[1] %}<option value="{{ k }}" {{ 'selected' if e and e.category == k }}>{{ c[0] }}</option>{% endfor %}</optgroup>
+</select></div>
+<div><label for="wo">Work order # <span class="muted">(optional)</span></label><input id="wo" name="wo_ref" value="{{ v('wo_ref') }}"></div>
+</div>
+
+<div class="fields">
+<div><label for="subj">Equipment or place</label><select id="subj" name="subject">
+<option value="">None, or type it below</option>
+{% if equipment %}<optgroup label="Equipment">{% for q in equipment %}<option value="asset:{{ q.np_id }}" {{ 'selected' if cur_subject == 'asset:' ~ q.np_id }}>{{ q.label }}{% if q.place %} · {{ q.place }}{% endif %}</option>{% endfor %}</optgroup>{% endif %}
+{% if places %}<optgroup label="Places">{% for q in places %}<option value="place:{{ q.np_id }}" {{ 'selected' if cur_subject == 'place:' ~ q.np_id }}>{{ q.path }}</option>{% endfor %}</optgroup>{% endif %}
+</select>
+{% if not equipment %}<p class="small muted">No equipment list yet. An admin can refresh it from Nameplate on the Buildings page.</p>{% endif %}</div>
+<div><label for="wt">Or where <span class="muted">(free text, not sent to Nameplate)</span></label><input id="wt" name="where_text" value="{{ v('where_text') }}" placeholder="e.g. loading dock, training room"></div>
+</div>
+
+<fieldset><legend>Time</legend>
+<div class="fields">
+<div><label for="st">Start</label><input id="st" type="time" name="start" value="{{ st }}"></div>
+<div><label for="en">End</label><input id="en" type="time" name="end" value="{{ en }}"></div>
+<div class="or">or</div>
+<div><label for="dh">How long</label><div class="actions"><input id="dh" type="number" name="dur_h" min="0" max="16" style="max-width:90px" value="{{ (e.minutes // 60) if e and e.minutes and not timed else '' }}" aria-label="Hours"> h
+<input type="number" name="dur_m" min="0" max="59" step="5" style="max-width:90px" value="{{ (e.minutes % 60) if e and e.minutes and not timed else '' }}" aria-label="Minutes"> min</div></div>
+</div><p class="small muted">Times are on this shift's clock. A night shift can run past midnight.</p></fieldset>
+
+<div class="fields"><div class="wide"><label for="nt">What was done</label><textarea id="nt" name="notes" required>{{ v('notes') }}</textarea></div>
+<div class="wide"><label for="mt">Materials or parts <span class="muted">(optional)</span></label><input id="mt" name="materials" value="{{ v('materials') }}"></div></div>
+
+<fieldset data-for="reading"><legend>Reading</legend><div class="fields">
+<div><label for="rn">What was read</label><input id="rn" name="reading_name" value="{{ v('reading_name') }}" placeholder="e.g. steam pressure"></div>
+<div><label for="rv">Value</label><input id="rv" name="reading_value" inputmode="decimal" value="{{ '%g'|format(e.reading_value) if e and e.reading_value is number else '' }}"></div>
+<div><label for="ru">Unit</label><input id="ru" name="reading_unit" value="{{ v('reading_unit') }}" placeholder="psi, °F, hours"></div>
+</div></fieldset>
+
+<fieldset data-for="inspection"><legend>Inspection or test result</legend><div class="actions">
+{% for k, lbl in RESULTS.items() %}<label class="check"><input type="radio" name="result" value="{{ k }}" {{ 'checked' if e and e.result == k }} style="width:22px;min-height:22px"> {{ lbl }}</label>{% endfor %}</div></fieldset>
+
+<fieldset><legend>Hand-off</legend>
+<label class="check"><input type="checkbox" name="follow_up" value="1" {{ 'checked' if e and e.follow_up }}> The next shift needs to follow up</label>
+<input name="follow_up_note" value="{{ v('follow_up_note') }}" placeholder="What still needs doing" aria-label="What still needs doing" style="margin-top:8px">
+{% if follow %}<label for="rs" style="margin-top:12px">This entry closes an earlier follow-up <span class="muted">(optional)</span></label>
+<select id="rs" name="resolves_entry_id"><option value="">No</option>
+{% for f in follow %}<option value="{{ f.id }}" {{ 'selected' if e and e.resolves_entry_id == f.id }}>{{ f.shift_start[:10] }} {{ f.subject_label or f.where_text or 'General' }}: {{ f.follow_up_note }}</option>{% endfor %}</select>{% endif %}
+</fieldset>
+
+{% if mode == 'correct' %}<div class="fields"><div class="wide"><label for="why">Reason for the correction</label><input id="why" name="reason" required placeholder="e.g. wrong unit, it was ELEV-2"></div></div>{% endif %}
+
+<div class="actions">
+<button class="btn primary" type="submit">{{ {'new': 'Save entry', 'edit': 'Save changes', 'correct': 'Save correction'}[mode] }}</button>
+{% if mode == 'correct' %}<button class="btn danger" type="submit" name="withdraw" value="1" formnovalidate onclick="if(!document.getElementById('why').value){alert('Give a reason first.');return false}">Withdraw it instead</button>{% endif %}
+</div>
+</form>
+{% if mode == 'edit' %}<form method="post" class="actions">{{ csrf() }}<input type="hidden" name="delete" value="1"><button class="btn danger" type="submit" onclick="return confirm('Delete this entry? The shift is still open, so nothing has been sent.')">Delete entry</button></form>{% endif %}
+
+<script>
+// Show the reading and result boxes only for the kinds of work that use them.
+(function(){var cat=document.getElementById('cat');function sync(){document.querySelectorAll('fieldset[data-for]').forEach(function(f){f.hidden=f.dataset.for!==cat.value})}cat.addEventListener('change',sync);sync()})();
+</script>
+{% endblock %}

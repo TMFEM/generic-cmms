@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block content %}
+<h1>Nameplate</h1>
+<div class="card"><p><span class="pill {{ 'closed' if ok else 'bad' }}">{{ 'Connected' if ok else 'Not connected' }}</span> {{ msg }}</p>
+{% if url %}<dl class="kv"><dt>Address</dt><dd>{{ url }}</dd><dt>Owner</dt><dd>{{ owner }}</dd></dl>{% endif %}</div>
+<div class="grid"><div class="stat"><div class="k">Sent</div><div class="v">{{ st.sent }}</div></div>
+<div class="stat"><div class="k">Waiting</div><div class="v">{{ st.waiting }}</div></div>
+<div class="stat"><div class="k">Gave up</div><div class="v">{{ st.gave_up }}</div></div></div>
+<form method="post" class="actions">{{ csrf() }}<input type="hidden" name="action" value="send"><button class="btn primary" type="submit">Send now</button></form>
+{% if st.problems %}<div class="card" style="margin-top:16px"><h2>Recent problems</h2><table><thead><tr><th>Item</th><th>Tries</th><th>Error</th><th>Outcome</th></tr></thead><tbody>
+{% for p in st.problems %}<tr><td>{{ p.kind }} #{{ p.local_id }}</td><td>{{ p.attempts }}</td><td>{{ p.last_error }}</td><td>{{ 'Sent later' if p.sent_at else 'Not sent' }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+<div class="card" style="margin-top:16px"><h2>What goes to Nameplate</h2>
+<p>When a shift is signed: maintenance work, inspections and tests, readings, rounds, and building events, but only if the entry names equipment or a place. Each one carries who did it, their credential, and the hours.</p>
+<p>What stays here: crew hours and status, training, safety meetings, vendor escorts, admin time, and supervisor notes.</p></div>
+{% endblock %}

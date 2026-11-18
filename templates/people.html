@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="head"><h1>People</h1>{% if me.role == 'admin' %}<a class="btn primary" href="{{ url_for('person_edit') }}">Add a person</a>{% endif %}</div>
+<div class="card scroll"><table><thead><tr><th>Name</th><th>Role</th><th>Trade</th><th>Credential</th><th>Nameplate</th><th>Sign-in</th><th></th></tr></thead><tbody>
+{% for u in rows %}<tr class="{{ '' if u.active else 'replaced' }}"><td>{{ u.name }}</td><td>{{ u.role|capitalize }}</td><td>{{ u.trade or '' }}</td>
+<td>{% if u.credential_type %}{{ u.credential_type }}{% if u.credential_number %} #{{ u.credential_number }}{% endif %}{% if u.credential_expires %}<br><span class="small muted">expires {{ u.credential_expires }}</span>{% endif %}{% endif %}</td>
+<td>{% if u.np_technician_id %}<span class="pill np" title="{{ u.np_technician_id }}">Linked</span>{% else %}<span class="small muted">Not linked</span>{% endif %}</td>
+<td>{{ u.email if u.pw_hash else ('No sign-in' if not u.email else u.email ~ ' (no password)') }}</td>
+<td>{% if me.role == 'admin' %}<a class="small" href="{{ url_for('person_edit', uid=u.id) }}">Edit</a>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+<p class="small muted">A linked person's work shows on their own portable record in Nameplate, with the credential above. Crew without a sign-in (helpers, porters) can still be on a shift; a supervisor logs their work.</p>
+{% endblock %}

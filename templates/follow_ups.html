@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block content %}
+<h1>Open follow-ups</h1><p class="muted">Items one shift handed to the next. Log the fix on an open shift, or close it with a note.</p>
+<div class="card">{% if rows %}<ul class="list">{% for f in rows %}
+<li><strong>{{ f.building }} · {{ f.subject_label or f.where_text or 'General' }}</strong>: {{ f.follow_up_note }}<br>
+<span class="small muted">Raised {{ f.shift_start|day }} {{ f.shift_name }} by {{ f.person }} · {{ label(f.category) }}: {{ f.notes }}</span>
+<div class="actions" style="margin-top:6px">
+{% set osid = open_shift.get(building_of[f.shift_id]) %}{% if osid %}<a class="btn small" href="{{ url_for('entry_new', sid=osid, resolves=f.id) }}">Log the fix on the open shift</a>{% endif %}
+{% if can_run(me) %}<form class="actions" method="post" action="{{ url_for('follow_up_close', eid=f.id) }}">{{ csrf() }}<input type="hidden" name="back" value="{{ url_for('follow_ups') }}"><input name="note" placeholder="Why it's closed" aria-label="Why it's closed" style="max-width:260px"><button class="btn small" type="submit">Close</button></form>{% endif %}
+</div></li>{% endfor %}</ul>
+{% else %}<p class="muted">Nothing open.</p>{% endif %}</div>
+{% endblock %}

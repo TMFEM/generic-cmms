@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block content %}
+<h1>Shift times</h1>
+<form method="post" class="card">{{ csrf() }}
+<table><thead><tr><th>Name</th><th>Starts</th><th>Ends</th></tr></thead><tbody>
+{% for t in rows %}<tr><td><input name="name_{{ t.id }}" value="{{ t.name }}" aria-label="Name"></td><td><input type="time" name="start_{{ t.id }}" value="{{ t.start_time }}" aria-label="Starts"></td><td><input type="time" name="end_{{ t.id }}" value="{{ t.end_time }}" aria-label="Ends"></td></tr>{% endfor %}
+<tr><td><input name="new_name" placeholder="Add a shift, e.g. Swing" aria-label="New shift name"></td><td><input type="time" name="new_start" aria-label="New start"></td><td><input type="time" name="new_end" aria-label="New end"></td></tr>
+</tbody></table>
+<p class="small muted">An end earlier than the start means the shift ends the next morning.</p>
+<button class="btn primary" type="submit">Save</button></form>
+{% endblock %}

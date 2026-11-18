@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_macros.html" import np_pill, when %}
+{% block title %}Shift report {{ s.building }} {{ s.starts_at[:10] }} {{ s.name }}{% endblock %}
+{% block content %}
+<div class="actions noprint" style="margin-bottom:12px"><a class="btn" href="{{ url_for('shift_page', sid=s.id) }}">Back to the shift</a><button class="btn primary" onclick="window.print()">Print or save as PDF</button></div>
+<div class="report">
+<div class="card"><h1>Shift report: {{ s.building }}</h1>
+<dl class="kv"><dt>Shift</dt><dd>{{ s.name }}, {{ s.starts_at|day }}, {{ s.starts_at|t }} to {{ s.ends_at|t }}</dd>
+<dt>Supervisor</dt><dd>{{ s.supervisor or '—' }}</dd>
+<dt>Status</dt><dd>{% if s.status == 'closed' %}Signed by {{ s.closed_by_name }}, {{ s.closed_at|day }} {{ s.closed_at|t }}{% else %}<strong>Open, not signed yet</strong>{% endif %}</dd>
+<dt>Turnover</dt><dd>{% if s.turnover_ack_at %}Received by {{ s.turnover_by_name }} at {{ s.turnover_ack_at|t }}{% if s.turnover_note %}: {{ s.turnover_note }}{% endif %}{% else %}Not recorded{% endif %}</dd>
+<dt>Time</dt><dd>{{ r.crew_minutes|hm }} crew time{{ ' so far' if r.so_far }} · {{ r.total_logged|hm }} logged in {{ r.entries|length }} entries</dd></dl>
+{% if s.notes %}<p><strong>Supervisor's notes:</strong> {{ s.notes }}</p>{% endif %}</div>
+
+<div class="card"><h2>Crew</h2><table><thead><tr><th>Name</th><th>Trade</th><th>Status</th><th>In</th><th>Out</th><th class="num">On shift</th><th class="num">Logged</th><th>Note</th></tr></thead><tbody>
+{% for c in r.crew %}<tr><td>{{ c.name }}</td><td>{{ c.trade or '' }}</td><td>{{ CREW_STATUSES[c.status] }}</td><td>{{ c.time_in|t }}</td><td>{{ c.time_out|t }}</td><td class="num">{{ c.minutes|hm }}{% if c.so_far %}<br><span class="small muted">so far</span>{% endif %}</td><td class="num">{{ c.logged|hm }}</td><td>{{ c.note or '' }}</td></tr>{% endfor %}
+</tbody></table></div>
+
+<div class="card"><h2>Time by type of work</h2><table><tbody>
+{% for cat, m in r.by_category %}<tr><td>{{ label(cat) }}</td><td class="num">{{ m|hm }}</td><td style="width:45%"><div class="barline"><span style="width:{{ (100 * m / r.total_logged)|round|int if r.total_logged else 0 }}%"></span></div></td></tr>{% endfor %}
+</tbody></table></div>
+
+<div class="card"><h2>Work and activities</h2><table><thead><tr><th>Time</th><th>Who</th><th>What</th><th>Equipment or place</th><th>Notes</th><th class="num">Time</th><th>Record</th></tr></thead><tbody>
+{% for e in r.entries %}<tr><td>{{ when(e) }}</td><td>{{ e.person }}</td><td>{{ label(e.category) }}{% if e.wo_ref %}<br>WO {{ e.wo_ref }}{% endif %}</td><td>{{ e.subject_label or '—' }}</td>
+<td>{{ e.notes }}{% if e.reading_value is not none %}<br><strong>{{ e.reading_name }}: {{ '%g'|format(e.reading_value) }} {{ e.reading_unit or '' }}</strong>{% endif %}{% if e.result %}<br>Result: {{ RESULTS[e.result] }}{% endif %}{% if e.materials %}<br>Materials: {{ e.materials }}{% endif %}</td>
+<td class="num">{{ e.minutes|hm }}</td><td>{{ np_pill(e) }}</td></tr>{% endfor %}
+</tbody></table></div>
+
+{% if r.events %}<div class="card"><h2>Building events</h2><ul class="list">{% for e in r.events %}<li>{{ when(e) }} · {{ e.subject_label or '' }}: {{ e.notes }} ({{ e.person }})</li>{% endfor %}</ul></div>{% endif %}
+{% if r.readings %}<div class="card"><h2>Readings</h2><table><tbody>{% for e in r.readings %}<tr><td>{{ e.subject_label }}</td><td>{{ e.reading_name }}</td><td class="num">{{ '%g'|format(e.reading_value) }} {{ e.reading_unit or '' }}</td><td>{{ when(e) }}</td><td>{{ e.person }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+
+<div class="card"><h2>Hand-off</h2>
+<h3>Open items carried in</h3>{% if r.carried_in %}<ul class="list">{% for f in r.carried_in %}<li>{{ f.subject_label or f.where_text or 'General' }}: {{ f.follow_up_note }} <span class="muted small">(raised {{ f.shift_start|day }})</span>{% if f.follow_up_closed_at %} · closed{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">None.</p>{% endif %}
+<h3>Raised this shift</h3>{% if r.raised %}<ul class="list">{% for e in r.raised %}<li>{{ e.subject_label or e.where_text or 'General' }}: {{ e.follow_up_note }}{% if e.follow_up_closed_at %} · closed{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">None.</p>{% endif %}
+</div>
+{% if r.corrected %}<div class="card"><h2>Replaced or withdrawn after sign-off</h2><table><tbody>{% for e in r.corrected %}<tr class="replaced"><td>{{ e.person }}</td><td>{{ label(e.category) }}</td><td>{{ e.subject_label or '' }}</td><td>{{ e.notes }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+<p class="small muted">Printed from {{ APP_NAME }}. Entries marked "In Nameplate" are also in the building's shared record.</p>
+</div>
+{% endblock %}

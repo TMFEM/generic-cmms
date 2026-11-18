@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="head"><div><h1>Reports</h1><p class="muted">Labor and work by building and date range. Only signed and open shifts in this app; Nameplate keeps the equipment history.</p></div></div>
+{% if not r %}<div class="card"><p>No buildings yet.</p></div>{% else %}
+<form method="get" class="card noprint"><div class="fields">
+<div><label for="b">Building</label><select id="b" name="building">{% for x in blds %}<option value="{{ x.id }}" {{ 'selected' if x.id == bid }}>{{ x.name }}</option>{% endfor %}</select></div>
+<div><label for="f">From</label><input id="f" type="date" name="from" value="{{ start }}"></div>
+<div><label for="t">To</label><input id="t" type="date" name="to" value="{{ end }}"></div>
+<div style="align-self:end" class="actions"><button class="btn primary" type="submit">Show</button>
+<a class="btn" href="{{ url_for('report_csv', building=bid, **{'from': start, 'to': end}) }}">Download entries (CSV)</a>
+<button class="btn" type="button" onclick="window.print()">Print</button></div></div></form>
+
+<h2>{{ b.name }}, {{ start }} to {{ end }}</h2>
+<div class="grid">
+<div class="stat"><div class="k">Shifts</div><div class="v">{{ r.shifts|length }}</div><div class="small muted">{{ r.open_shifts }} still open</div></div>
+<div class="stat"><div class="k">Crew time</div><div class="v">{{ '%.1f'|format(hours(r.on_shift)) }} h</div></div>
+<div class="stat"><div class="k">Logged</div><div class="v">{{ '%.1f'|format(hours(r.total)) }} h</div><div class="small muted">{{ (100 * r.total / r.on_shift)|round|int if r.on_shift else 0 }}% of crew time</div></div>
+<div class="stat"><div class="k">On equipment and building</div><div class="v">{{ '%.1f'|format(hours(r.maintenance)) }} h</div><div class="small muted">{{ r.in_nameplate }} entries in Nameplate</div></div>
+<div class="stat"><div class="k">Preventive share</div><div class="v">{{ (r.pm_share ~ '%') if r.pm_share is not none else '—' }}</div><div class="small muted">of PM plus repair time</div></div>
+<div class="stat"><div class="k">Open follow-ups</div><div class="v">{{ r.follow_ups|length }}</div></div>
+</div>
+
+<div class="card"><h2>Time by type of work</h2><table><tbody>
+{% for c in r.cats %}<tr><td>{{ label(c) }}</td><td class="num">{{ '%.1f'|format(hours(r.by_cat[c])) }} h</td><td style="width:45%"><div class="barline"><span style="width:{{ (100 * r.by_cat[c] / r.total)|round|int if r.total else 0 }}%"></span></div></td></tr>
+{% else %}<tr><td class="muted">Nothing logged in this range.</td></tr>{% endfor %}</tbody></table></div>
+
+<div class="card scroll"><h2>By person</h2><table><thead><tr><th>Name</th><th class="num">Shifts</th><th class="num">Called out</th><th class="num">Crew time</th><th class="num">Logged</th>{% for c in r.cats %}<th class="num" title="{{ label(c) }}">{{ short(c) }}</th>{% endfor %}</tr></thead><tbody>
+{% for p in r.people %}<tr><td>{{ p.name }}</td><td class="num">{{ p.shifts }}</td><td class="num">{{ p.call_outs or '' }}</td><td class="num">{{ '%.1f'|format(hours(p.on_shift)) }}</td><td class="num">{{ '%.1f'|format(hours(p.logged)) }}</td>
+{% for c in r.cats %}<td class="num">{{ ('%.1f'|format(hours(p.by_cat[c]))) if p.by_cat[c] else '' }}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table>
+<p class="small muted">Logged time below crew time isn't a problem by itself: rounds, breaks and travel aren't always written down. Use it to ask, not to judge.</p></div>
+
+{% if r.follow_ups %}<div class="card"><h2>Open follow-ups</h2><ul class="list">{% for f in r.follow_ups %}<li>{{ f.subject_label or f.where_text or 'General' }}: {{ f.follow_up_note }} <span class="small muted">(raised {{ f.shift_start|day }} by {{ f.person }})</span></li>{% endfor %}</ul></div>{% endif %}
+
+<div class="card"><h2>Shifts in this range</h2><ul class="list">{% for s in r.shifts %}<li><a href="{{ url_for('shift_report', sid=s.id) }}">{{ s.starts_at|day }} · {{ s.name }}</a> <span class="pill {{ s.status }}">{{ 'Signed' if s.status == 'closed' else 'Open' }}</span></li>{% endfor %}</ul></div>
+{% endif %}
+{% endblock %}

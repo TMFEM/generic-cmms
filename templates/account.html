@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block content %}
+<h1>{{ me.name }}</h1><p class="muted">{{ me.role|capitalize }}{% if me.trade %} · {{ me.trade }}{% endif %}</p>
+<form method="post" class="card" style="max-width:480px">{{ csrf() }}<h2>Change password</h2>
+<div class="fields"><div class="wide"><label for="c">Current password</label><input id="c" type="password" name="current" autocomplete="current-password" required></div>
+<div class="wide"><label for="n">New password</label><input id="n" type="password" name="new" autocomplete="new-password" minlength="10" required></div></div>
+<button class="btn primary" type="submit">Change password</button></form>
+{% endblock %}
